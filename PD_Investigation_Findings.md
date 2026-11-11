@@ -8,7 +8,7 @@
 1. [Summary](#1-summary)
 2. [Devices and cables](#2-devices-and-cables)
 3. [Capture index](#3-capture-index)
-4. [Finding A: intermittent negotiation failure (HP + Sandberg)](#4-finding-a-intermittent-negotiation-failure-hp--sandberg)
+4. [Finding A: intermittent negotiation failure (Sandberg + some sinks)](#4-finding-a-intermittent-negotiation-failure-sandberg--some-sinks)
 5. [Finding B: Sandberg C1 never offers more than 60 W](#5-finding-b-sandberg-c1-never-offers-more-than-60-w)
 6. [Finding C: other protocol quirks](#6-finding-c-other-protocol-quirks)
 7. [Timing and power measurements](#7-timing-and-power-measurements)
@@ -24,7 +24,7 @@ There are **two independent problems** with the Sandberg powerbank:
 
 | # | Problem | Most likely cause | Confidence |
 |---|---|---|---|
-| **A** | The HP laptop sometimes never answers the Sandberg's power offers. The Sandberg sends 50 offers (about 8.6 s), gives up and stays at 5 V with no charging | An interaction: the **HP (awake, dual-role) gets stuck** when 5 V arrives late, and the **Sandberg switches 5 V on slowly (300–440 ms)** when it starts as a fixed source | Hypothesis, strongly supported. A test is pending (section 8) |
+| **A** | When the **Sandberg powers on first**, some sinks never answer its power offers. The Sandberg sends 50 offers (about 8.6 s), gives up and stays at 5 V with no charging | It happens with the **HP (awake)** and the **Anker 737 as a sink**, never with the ASUS, the Oppo or the sleeping HP. Once it happens, the **Sandberg stays stuck even after the sink is unplugged**. Slow 5 V switch-on is **ruled out** as the sole trigger | Pattern confirmed (72 plug-ins). Exact trigger not identified |
 | **B** | The Sandberg's "100 W" port (C1) only ever offers **20 V 3 A = 60 W** | The Sandberg **never supplies VCONN**, so it can't read the cable's e-marker. Under the PD spec it must then cap at 3 A | **Confirmed by measurement** |
 
 A **third mode, on the C2 (27 W) port only**, was captured as well. The Sandberg doesn't run PD at all and outputs about 4.6 V, and the laptop falls back to slow 5 V charging (section 4.5).
@@ -89,10 +89,15 @@ All three cables answer cable-identity requests correctly whenever the requester
 | `F0KYM-HTN1-533/Sandberg3Fails1OK_PowerZ_at_C1pd.sqlite` | **Power-Z at Sandberg C1**, HP cable | Awake | 3 FAIL, 1 OK |
 | `F0KYM-HTN1-533/Sandberg3Fails1OK_PowerZ_at_C1_WorstSoFar_27Wpd.sqlite` | Power-Z at **Sandberg C2 (27 W)**, HP cable | Awake | **No PD at all.** The Sandberg outputs about 4.6 V, the laptop's 3 Hard Resets are ignored, the laptop falls back to 5 V (max 13.9 W) and re-attaches every ~10 s (section 4.5) |
 | `F0KYM-HTN1-533/Sanberg_several_retries15s_AnkerOKpd.sqlite` | Power-Z at Sandberg C1, HP cable. Laptop side unplugged, **15 s wait** before each replug. Then Anker 737 | Awake | **Sandberg 4 of 4 FAIL** (all Sandberg-first). Anker OK (laptop-first, PR_Swap, 5 A) |
+| `F0KYM-HTN1-533/HPEliteBookT2-testpd.sqlite` | **T2**: Power-Z at C1, HP cable, 15 s wait | Awake | First plug-in FAIL. The Sandberg then **stays stuck for 2 minutes** through 4 replugs (section 4.3) |
+| `F0KYM-HTN1-533/ASUSProArtP16T4-testpd.sqlite` | **T4**: Sandberg → ASUS, 15 s wait | Awake | **6 of 6 OK**, all Sandberg-first, 20 V 3 A, 55 W |
+| `F0KYM-HTN1-533/Sandberg_Charging_Anker737_T5-testpd.sqlite` | **T5**: Sandberg → Anker 737 (as sink), 15 s wait | — | First plug-in FAIL. Same stuck state as the HP, persisting through 4 replugs |
+| `F0KYM-HTN1-533/Oppo_T7-OTG-offpd.sqlite` | **T7**: Sandberg → Oppo Find X9 Pro, OTG off | — | **5 of 5 OK**. Uses the Sandberg's **PPS** (about 8.5 V 3 A, up to 26 W) |
+| `F0KYM-HTN1-533/Oppo_T7-OTG-onpd.sqlite` | **T7**: same, OTG on | — | **5 of 5 OK**. Fixed 9 V 1.5–2 A |
 
 ---
 
-## 4. Finding A: intermittent negotiation failure (HP + Sandberg)
+## 4. Finding A: intermittent negotiation failure (Sandberg + some sinks)
 
 ### 4.1 What a failure looks like
 
@@ -148,27 +153,58 @@ Both devices are **dual-role (DRP)**: each can supply or take power, and while u
 - If the cable is unplugged at the Sandberg for more than 7 s, the outcome is **always Sandberg-first, so always fail**.
 - If the cable stays attached, it's a random race.
 
-**Control observations:**
-- The **Anker 737** never triggers the stuck state. It switches 5 V on 26–46 ms after attach, in either role order.
-- The **ASUS ProArt P16**, also a dual-role laptop that cycles while awake, worked with the Sandberg as a fixed source **even with a 450 ms switch-on delay**. That's one data point so far.
-- **Below 30%:** plug-ins about 15 s apart meant the Sandberg was always fixed as source, so 5 of 6 failed.
+**Other partners, with the Sandberg forced to power on first (tests T2–T7):**
+
+| Sink | Sandberg-first plug-ins | Result | Sandberg 5 V switch-on delay |
+|---|---|---|---|
+| HP EliteBook (awake) | 22 (all captures) | **20 FAIL**, 2 late OK | 179–521 ms |
+| **Anker 737 as sink** | 1 | **FAIL**, same signature (CC 1.98 V / 0.88 V) | 179 ms |
+| ASUS ProArt P16 (awake) | 8 | **8 OK** | 220–511 ms |
+| Oppo Find X9 Pro, OTG off | 5 | **5 OK** | 179–900 ms |
+| Oppo Find X9 Pro, OTG on | 5 | **5 OK** | 890–900 ms |
+| HP EliteBook (asleep) | 6 | **6 OK** | 199–522 ms |
+
+What this shows:
+- **It isn't HP-specific:** the Anker 737 fails the same way.
+- **It isn't the delay:** the ASUS and the Oppo tolerate equal or much longer delays.
+
+**The Sandberg stays stuck after the sink is unplugged (T2, T5).** After the first failed plug-in, the Sandberg kept **VBUS at 5.14 V for the whole 2-minute capture**. It also held the communication CC line at **about 1.94–1.98 V** and its VCONN pin at **0.86–0.88 V**, even during the 15 s periods with the device unplugged and only the cable attached. A normal source in that situation reads about 3.25 V (an open pull-up), detects the detach and switches VBUS off, as it did in T4 and T7.
+- Each replug shows a 150 ms dip to about 1.52 V (the new sink's Rd) and then a return to the stuck level.
+- The Sandberg sends **no new offers after a replug**.
+- Only unplugging the cable **from the Sandberg itself** clears it.
+
+This means the faulty CC level is produced, at least in part, **by the Sandberg**, not only by the sink.
+
+*Caveat: this assumes the device end was unplugged during the 15 s waits, as in the procedure.*
+
+**Below 30%:** plug-ins about 15 s apart meant the Sandberg was always fixed as source, so 5 of 6 failed.
 
 ### 4.4 Working hypothesis
 
-> The HP EliteBook 840 G11's USB-C port, while awake and cycling as a dual-role port, mishandles **late** VBUS arrival. If the source takes several hundred ms to switch VBUS on after attach (still within the spec, which allows about 475 ms), the HP moves into a source-like state (Rp on both CC pins) and never runs its PD receiver as a sink. The Sandberg is a reliable trigger, because it is slow as a fixed source, it doesn't recover, and it never Hard Resets.
+> **Revised after tests T2–T7.** When the Sandberg powers on first, its CC interface sometimes enters a faulty state at the moment it switches VBUS on:
+> - the communication CC line sits at about **1.95–2.0 V**;
+> - its VCONN pin sits at about **0.86 V**;
+> - no sink acknowledges its PD messages;
+> - it no longer detects detach, so VBUS stays on with nothing attached.
+>
+> Whether it enters this state depends on the partner. The **awake HP** and the **Anker 737** trigger it; the **ASUS**, the **Oppo** and the **sleeping HP** don't.
+>
+> The earlier "HP mishandles late VBUS" idea is **not supported**: the Anker fails too, and the ASUS and Oppo tolerate equal or longer delays.
 
-Supporting:
-- every observed condition fits;
-- the ASUS tolerates the same delay;
-- the HP's own adapter and the Anker are fast.
+Consistent with the data, though not proven:
+- **The partners that trigger it** (HP awake, Anker 737) are devices that also like to be a power source. While awake the HP cycles between offering and taking power, and the Anker as a powerbank is the same. During the Sandberg's attach they may briefly present a source pull-up (Rp), which seems to throw the Sandberg into the faulty state. On the HP side, an Rp was seen on the laptop's VCONN pin during failures (0.55 V).
+- **The faulty levels fit a simple model:** both of the Sandberg's CC pins pulled to about 1.95 V through about 1.3 kΩ, instead of a normal 330 µA Rp. That predicts:
+  - 1.95 V with nothing attached (measured 1.94 V);
+  - about 0.86 V into the cable's Ra (measured 0.86 V);
+  - about 1.55 V with only a sink's Rd (measured 1.52 V at the moment of replug).
 
-Not yet proven:
-- the threshold delay;
-- whether the newer EliteBook a second tester uses is immune because of different firmware or a different PD controller, or because of a different plug-in pattern.
+Not yet known:
+- why the ASUS and the Oppo (even with OTG on) don't trigger it;
+- whether the Sandberg's malformed CC level is also why sinks can't decode its messages.
 
 ![Switch-on delay vs outcome](charts/03_switch_on_delay.png)
 
-*Delay from the laptop settling as a sink to 5 V switch-on, for plug-ins where the powerbank powered on first. The awake HP is the only combination that fails, and only the Sandberg is slow. This is a correlation; tests 8.2 (T4–T7) are meant to separate cause from coincidence.*
+*Delay from the sink settling to 5 V switch-on, for plug-ins where the powerbank powered on first. The ASUS and the Oppo negotiate fine with the Sandberg at the same or longer delays, so the slow switch-on is not the trigger on its own.*
 
 ### 4.5 Second failure mode: the Sandberg's PD engine is silent
 
@@ -194,8 +230,8 @@ after ~9 s the laptop detaches, re-attaches ~3 s later → loop
 ### 4.6 Workarounds
 
 - Plug in while the laptop is **asleep**, then wake it. This is the only reliable workaround: 9 of 9 OK.
-- Keep the cable attached to the Sandberg and replug only at the laptop. Each attempt is then a race the laptop sometimes wins.
-- If it fails, unplug at the laptop and try again.
+- With the cable kept in the Sandberg, replugging at the laptop is a race the laptop sometimes wins. This only works if the previous attempt didn't leave the Sandberg stuck.
+- If it fails, **unplug the cable from the Sandberg** (not just the laptop end): the Sandberg stays stuck otherwise. Then try again.
 
 ---
 
@@ -293,7 +329,7 @@ Searches in English and Nordic languages found **no** reviews or forum reports o
 | Test | Steps | Prediction if the hypothesis is right |
 |---|---|---|
 | T1 | HP awake. Unplug **at the Sandberg**, **wait 2 s**, replug. Repeat 5× | Mixed: OK only when the laptop wins the race to source |
-| T2 | HP awake. Unplug, **wait 15 s**, replug. Repeat 5× | **Done:** 4 of 4 FAIL (unplugged at the laptop side; all Sandberg-first) |
+| T2 | HP awake. Unplug, **wait 15 s**, replug. Repeat 5× | **Done (twice):** 4 of 4 FAIL; then FAIL, after which the Sandberg stayed stuck through 4 replugs |
 | T2b | Like T2, but unplug **at the Sandberg** (forces Sandberg-first) | All FAIL |
 | T3 | Like T2, but with the HP asleep | All OK |
 
@@ -301,10 +337,11 @@ Searches in English and Nordic languages found **no** reviews or forum reports o
 
 | Test | Steps | What it shows |
 |---|---|---|
-| T4 | **ASUS ProArt P16** awake, T2 procedure (wait 15 s) × 5, Power-Z recording | If all OK, a dual-role laptop tolerates the Sandberg's slow switch-on, which points at the HP |
-| T5 | **Sandberg C1 → Anker 737** (Anker as the sink), T2 procedure × 5 | Same question with a dual-role powerbank. Check which device ends up as source |
+| T4 | **ASUS ProArt P16** awake, T2 procedure (wait 15 s) × 5, Power-Z recording | **Done: 6 of 6 OK** (Sandberg-first, 220–511 ms delays) |
+| T5 | **Sandberg C1 → Anker 737** (Anker as the sink), T2 procedure × 5 | **Done: FAIL**, then the Sandberg stayed stuck through 4 replugs. **So it isn't HP-specific** |
+| T5b | Repeat T5 and T2, but unplug **the cable from the Sandberg** between attempts, so each attempt starts fresh | Gets 5 independent data points per partner |
 | T6 | HP + Anker 737, with the Anker as a fixed source (wait 15 s) | Already OK in the captures. Repeat to rule out chance |
-| T7 | **Oppo Find X9 Pro** + Sandberg C1, T2 procedure (wait 15 s) × 5. Once with **OTG off** and once with **OTG on** (phones usually only cycle as dual-role with OTG on) | A third sink. OTG off = sink-only control, OTG on = dual-role. Also shows whether the Sandberg's PPS works. Note: Oppo's "100 W" is most likely its proprietary SUPERVOOC, so standard PD/PPS will probably negotiate much less, and this test can't check the 100 W / 5 A issue |
+| T7 | **Oppo Find X9 Pro** + Sandberg C1, T2 procedure (wait 15 s) × 5. Once with **OTG off** and once with **OTG on** | **Done: 5 of 5 OK each.** The Sandberg's PPS works (about 8.5 V 3 A, 26 W, OTG off). OTG on used fixed 9 V |
 
 ### 8.3 Laptop side
 
