@@ -24,7 +24,7 @@ The Sandberg powerbank has **two independent problems**:
 
 | # | Problem | Most likely cause | Confidence |
 |---|---|---|---|
-| **A** | Some sinks do not answer the power offers when the **Sandberg powers on first**. The Sandberg sends 50 offers in about 8.6 s. Then it stops and stays at 5 V with no charging | The **HP (awake)** and the **Anker 737 as a sink** cause it. The ASUS, the Oppo and the sleeping HP do not. After a failure, the **Sandberg stays in the fault** until you unplug the cable from the Sandberg. A slow 5 V switch-on alone does **not** cause it | The pattern is the same in all 82 plug-ins. We did not find the exact trigger |
+| **A** | Some sinks do not answer the power offers when the **Sandberg powers on first**. The Sandberg sends 50 offers in about 8.6 s. Then it stops and stays at 5 V with no charging | The **HP (awake)** and the **Anker 737** try to become the source a few ms after VBUS comes on (Try.SRC behaviour). A compliant source (the Anker) detects this and removes VBUS. The **Sandberg does not**. It keeps VBUS on and goes into a CC fault state that it does not leave until you unplug the cable from the Sandberg | The pattern is the same in all 102 plug-ins. The reference recordings show the mechanism (section 4.4) |
 | **B** | The Sandberg "100 W" port (C1) always offers **20 V 3 A = 60 W** at most | The **Sandberg does not supply VCONN**, so it cannot read the cable e-marker. The PD specification then limits the source to 3 A | **Proven by measurement** |
 
 We also recorded a **third fault, on the C2 (27 W) port only**. On C2 the Sandberg does not run PD and supplies only about 4.6 V. The laptop then charges slowly at 5 V (section 4.5).
@@ -98,6 +98,9 @@ All three cables send a valid identity reply when the requester supplies VCONN.
 | `F0KYM-HTN1-533/HPEliteBookT2-test_T5bpd.sqlite` | **T5b**: HP. Unplug at the Sandberg between attempts | Awake | **5 of 5 FAIL** (each attempt starts from 0 V) |
 | `F0KYM-HTN1-533/Sandberg_Charging_Anker737_T5b-testpd.sqlite` | **T5b**: Anker 737 as sink. Unplug at the Sandberg between attempts | — | **5 of 5 FAIL** (each attempt starts from 0 V) |
 | `F0KYM-HTN1-533/T5bSandberg_Charging_HPuserdata.db` | **T5b repeat, Data Recorder 1 kSPS** (analog values only, no PD messages), HP, Power-Z at C1 | Awake | 4 FAIL, 1 OK (laptop first). Shows the fault step about 4 ms after switch-on |
+| `F0KYM-HTN1-533/DR1kSPS_Anker_Charging_HPuserdata.db` | **Reference, Data Recorder 1 kSPS**: Anker 737 → HP, Power-Z at the Anker port. Unplug at the Anker | Awake | All OK. The HP adds Rp 4 ms after the Anker switches 5 V on. The Anker removes VBUS within 13 ms. Then the HP is the source, and a role swap follows |
+| `F0KYM-HTN1-533/DR1kSPS_Anker_Charging_Sandberguserdata.db` | **Reference**: Anker 737 ↔ Sandberg, Power-Z at the Anker port | — | The Sandberg won the race and became the source. Then the same fault as with the HP occurred. The Anker showed Rp on its VCONN pin 1 ms after VBUS. The PD line went to 2.0 V, and the Sandberg stayed stuck |
+| `F0KYM-HTN1-533/DR1kSPS_Anker_Charging_Asususerdata.db` | **Reference**: Anker 737 → ASUS, Power-Z at the Anker port | Awake | All OK. The ASUS does not add Rp after VBUS |
 
 ---
 
@@ -153,7 +156,7 @@ Both devices are **dual-role ports (DRP)**. Each device can supply power or take
 | First source | Sequence | Result (HP awake) |
 |---|---|---|
 | **Laptop first** (the laptop finds the Sandberg in its sink role) | The laptop supplies **5.05–5.10 V** for a short time. Then the Sandberg becomes the source and switches 5 V on **about 80 ms** later | **OK** every time |
-| **Sandberg first** (fixed source, or the Sandberg wins the race) | The Sandberg switches 5 V on **179–521 ms** after the sink attaches. Its VCONN pin goes from 0.32 V to 0.86 V | **Failure**, 25 of 27 times |
+| **Sandberg first** (fixed source, or the Sandberg wins the race) | The Sandberg switches 5 V on **179–521 ms** after the sink attaches. Its VCONN pin goes from 0.32 V to 0.86 V | **Failure**, 29 of 31 times |
 
 - If the cable is out of the Sandberg for more than 7 s, the Sandberg is always the first source. Then the plug-in always fails.
 - If the cable stays in the Sandberg, the result is a random race.
@@ -162,11 +165,12 @@ Both devices are **dual-role ports (DRP)**. Each device can supply power or take
 
 | Sink | Sandberg-first plug-ins | Result | Sandberg 5 V switch-on delay |
 |---|---|---|---|
-| HP EliteBook (awake) | 27 (all captures, with 5 independent T5b attempts) | **25 FAIL**, 2 late OK | 179–521 ms |
-| **Anker 737 as sink** | 6 (with 5 independent T5b attempts) | **6 FAIL**, same signature (CC 1.96–1.98 V / 0.88 V) | 176–441 ms |
-| ASUS ProArt P16 (awake) | 8 | **8 OK** | 220–511 ms |
+| HP EliteBook (awake) | 31 (all captures, with 9 independent T5b attempts) | **29 FAIL**, 2 late OK | 179–521 ms |
+| **Anker 737 as sink** | 11 (with 10 independent T5b and T8 attempts) | **11 FAIL**, same signature (CC 1.96–2.00 V / 0.88 V) | 176–441 ms |
+| ASUS ProArt P16 (awake) | 12 (and 1 with the ASUS as the first source) | **13 OK** | 220–511 ms |
 | Oppo Find X9 Pro, OTG off | 5 | **5 OK** | 179–900 ms |
 | Oppo Find X9 Pro, OTG on | 5 | **5 OK** | 890–900 ms |
+| Oppo Find X9 Pro (T8, Data Recorder) | 5 | **5 OK** | not measured |
 | HP EliteBook (asleep) | 6 | **6 OK** | 199–522 ms |
 
 Conclusions from this table:
@@ -188,20 +192,27 @@ Thus the Sandberg itself causes the fault level on the CC pins, at least in part
 
 ### 4.4 Working hypothesis
 
-> **Revised after tests T2–T7.** When the Sandberg powers on first, its CC interface sometimes goes into a fault state when it switches VBUS on. In the fault state:
+> **Revised after the reference recordings.** The fault is a role conflict that the Sandberg does not handle:
 >
-> - The PD line is at about **1.95–2.0 V**.
-> - The Sandberg VCONN pin is at about **0.86 V**.
-> - No sink acknowledges the Sandberg PD messages.
-> - The Sandberg does not detect a detach. VBUS stays on with nothing attached.
+> 1. The Sandberg attaches as the source and switches VBUS on.
+> 2. A few milliseconds later, the **HP (awake)** or the **Anker 737** changes its CC termination from Rd (sink) to **Rp (source)**. This is Try.SRC behaviour: a dual-role port that prefers the source role tries to take it.
+> 3. A compliant source sees the PD line go open (both sides have Rp). It removes VBUS and lets the partner become the source. A role swap then gives a normal contract.
+> 4. The **Sandberg does not see the open line**. The line goes only to about 1.95–2.0 V, not to about 3.2 V. The Sandberg keeps VBUS on, its VCONN pin goes to about 0.86 V, and no PD contract occurs. The Sandberg stays in this state until you unplug the cable from the Sandberg.
 >
-> The partner decides if the fault occurs. The **awake HP** and the **Anker 737** cause it. The **ASUS**, the **Oppo** and the **sleeping HP** do not.
->
-> The data does **not** support the earlier idea that the HP cannot accept a late VBUS. The Anker also fails, and the ASUS and the Oppo accept equal or longer delays.
+> The ASUS, the Oppo and the sleeping HP do not try to become the source after VBUS comes on. Thus they never cause the fault.
 
-The data agrees with these points, but the points are not proven:
+**Evidence from the reference recordings (Data Recorder, 1 kSPS):**
 
-- **The partners that cause the fault** (HP awake, Anker 737) also operate as power sources. When it is awake, the HP changes between the two roles. The Anker, as a powerbank, does the same. During the Sandberg attach, these devices may show a source pull-up (Rp) for a short time. This may put the Sandberg into the fault state. On the HP side, we measured an Rp on the laptop VCONN pin during failures (0.55 V).
+- **Anker 737 → HP:** the HP adds its Rp **4 ms** after the Anker switches 5 V on. The PD line goes to **3.2 V** (open). The Anker removes VBUS **13 ms** after switch-on. Then the HP supplies 5.10 V, and a role swap follows. Each plug-in worked.
+- **Sandberg → HP:** the step on the Sandberg side occurs at **+3 to +5 ms**, the same time as the HP Rp step with the Anker. But the line goes only to about **1.95 V**, and VBUS stays on.
+- **Anker 737 ↔ Sandberg:** the Sandberg became the source. The meter at the Anker port shows the Anker put Rp on its own VCONN pin (0 → 0.31 V) **1 ms** after VBUS. At the same time the PD line went to 2.0 V. This is the same fault, seen from the sink side.
+- **Anker 737 → ASUS:** the ASUS does not add Rp after VBUS. Each plug-in worked.
+
+Chart 7 below compares the same HP plug-in with the Anker and with the Sandberg as the source.
+
+Other points from the data:
+
+- On the HP side, we measured an Rp on the laptop VCONN pin during failures (0.55 V). This agrees with the HP in a source-like state.
 - **A simple model gives the fault levels.** In the model, the Sandberg connects both CC pins to about 1.95 V through about 1.3 kΩ. A normal Rp is a 330 µA current source. The model gives:
   - 1.95 V with nothing attached (we measured 1.94 V).
   - About 0.86 V into the cable Ra (we measured 0.86 V).
@@ -209,7 +220,7 @@ The data agrees with these points, but the points are not proven:
 
 Open questions:
 
-- Why do the ASUS and the Oppo (also with OTG on) not cause the fault?
+- Why does the Sandberg keep the line at about 1.95 V and its VCONN pin at 0.86 V when the partner adds Rp? A normal source line goes to about 3.2 V. T9 can show the first microseconds.
 - Does the fault CC level also prevent the sinks from decoding the Sandberg messages?
 
 **Inrush current is now an unlikely cause.** The 1 kSPS Data Recorder run (below) shows no VBUS drop at switch-on. The fault starts **3–5 ms after VBUS is stable**. It is one step on both Sandberg CC pins at the same time.
@@ -231,9 +242,34 @@ The single success used the laptop-first path. At that plug-in the Sandberg stil
 - Only the path to the source role is different.
 - Only the direct path gives the step.
 
-Thus the cause is probably an action in the **Sandberg attach sequence**. Some milliseconds after VBUS switch-on, the Sandberg firmware changes both CC pins. A defective VCONN switch-on or a change of the pull-ups agrees with the data. The Sandberg does this when it attaches directly as a source. It does not do this when it becomes the source after a role swap. We do not know why the ASUS and the Oppo do not cause the fault. A 1 kSPS recording with them can show if the step occurs (test T8).
+Thus the cause is probably an action in the **Sandberg attach sequence**. Some milliseconds after VBUS switch-on, the Sandberg firmware changes both CC pins. A defective VCONN switch-on or a change of the pull-ups agrees with the data. The Sandberg does this when it attaches directly as a source. It does not do this when it becomes the source after a role swap. We do not know why the ASUS and the Oppo do not cause the fault.
 
 ![Fault onset at 1 ms resolution](charts/05_fault_onset_1ms.png)
+
+**T8: the CC step with each sink (Data Recorder, 1 kSPS, Power-Z at C1, Sandberg is the first source):**
+
+| Sink | Plug-ins | CC step after 5 V switch-on | Result |
+|---|---|---|---|
+| HP EliteBook (awake) | 4 (T5b recording) | **Yes**, at +3 to +5 ms | 4 FAIL |
+| Anker 737 (as sink) | 5 | **Yes**, at +1 to +2 ms | 5 FAIL. The CC pins stay at 1.98–2.00 V / 0.88 V |
+| ASUS ProArt P16 | 4 (and 1 with the ASUS as the first source) | **No** | 5 OK, 20 V |
+| Oppo Find X9 Pro | 5 | **No** | 5 OK, PPS / 9 V |
+
+What T8 shows:
+
+- The CC step occurs with **each** failure and with **no** success. The step is the fault.
+- The step occurs only with the HP and the Anker 737. It does not occur with the ASUS or the Oppo.
+- The step time is different for each sink: +1 to +2 ms with the Anker, +3 to +5 ms with the HP. Thus the Sandberg probably reacts to something that the sink does just after VBUS comes on.
+- Before switch-on, all four sinks show similar CC levels (Rd 1.59–1.70 V, cable Ra 0.32 V). The 1 kSPS data shows no difference that explains the step.
+- The PD captures show no message from the sink before the step. The first PD message is the Sandberg SOP' probe, about 50 ms after switch-on. Thus the trigger is electrical, not a PD message.
+
+To find the trigger, the next tool must sample faster than the Data Recorder. Use an oscilloscope or a logic analyzer on CC1, CC2 and VBUS at C1 (see test T9).
+
+![CC step by sink](charts/06_cc_step_by_sink.png)
+
+![Try.SRC with the Anker vs the Sandberg](charts/07_try_src_anker_vs_sandberg.png)
+
+*The same HP, awake, with the powerbank as the first source. Left: the Anker removes VBUS after the HP adds its Rp, and the negotiation succeeds. Right: the Sandberg keeps VBUS on, and the negotiation fails.*
 
 ![Switch-on delay vs outcome](charts/03_switch_on_delay.png)
 
@@ -376,7 +412,8 @@ We searched in English and in Nordic languages. We found **no** review or forum 
 | T5b | Do T5 and T2 again. Unplug **at the Sandberg** between attempts, so that each attempt starts from 0 V | **Done: HP 5 of 5 FAIL, Anker 737 5 of 5 FAIL.** VBUS went off between attempts. The Sandberg was the first source each time |
 | T6 | HP + Anker 737, with the Anker as a fixed source (wait 15 s) | All captures show OK. Do it again to exclude chance |
 | T7 | **Oppo Find X9 Pro** + Sandberg C1, T2 procedure (wait 15 s), 5 times. One time with **OTG off**, one time with **OTG on** | **Done: 5 of 5 OK each.** The Sandberg PPS works (about 8.5 V 3 A, 26 W, OTG off). With OTG on the phone used fixed 9 V |
-| T8 | **Data Recorder (1 kSPS) at C1.** Sandberg-first plug-ins with the **ASUS** and the **Oppo**. Use the Anker 737 for comparison | Shows if the CC step at about 4 ms also occurs with the partners that work, and if the Sandberg then removes it. This can show what the Sandberg reacts to |
+| T8 | **Data Recorder (1 kSPS) at C1.** Sandberg-first plug-ins with the **ASUS** and the **Oppo**. Use the Anker 737 for comparison | **Done.** The CC step occurs with the Anker (5 of 5, all FAIL). It does not occur with the ASUS (5 of 5 OK) or the Oppo (5 of 5 OK). See section 4.4 |
+| T9 | **Oscilloscope or logic analyzer** (µs resolution) on CC1, CC2 and VBUS at C1. Compare a Sandberg-first plug-in with the Anker or the HP against one with the ASUS | Shows what occurs in the 1–5 ms before the step: a short Rp from the sink, a CC glitch, or a VBUS current spike |
 
 ### 8.3 Laptop side
 
@@ -390,6 +427,7 @@ We searched in English and in Nordic languages. We found **no** review or forum 
 - **CC1 / CC2:** the two configuration pins in the receptacle. One pin connects to the CC wire, which goes through the cable from end to end. It carries attach detection and all PD messages. The other pin becomes the **VCONN** pin.
 - **Rp / Rd / Ra:** the pull-up on CC (source), the 5.1 kΩ pull-down (sink), and the about 1 kΩ cable e-marker resistor. Each side uses the CC voltage to find what is attached and the current level that the source offers.
 - **DRP (dual-role port):** a port that changes between Rp and Rd when nothing is attached. Thus it can become the source or the sink.
+- **Try.SRC:** an optional Type-C behaviour of a DRP that prefers the source role. When it attaches as a sink, it changes to Rp for a short time to try to become the source. The other port must then remove VBUS and become the sink. If the other port cannot, the Try.SRC port goes back to the sink role.
 - **VCONN:** 3–5.5 V power on the unused CC pin. The **VCONN source** supplies it. VCONN supplies power to the electronics in the cable plug (the e-marker). VCONN is **not** a data lane, and it does not go through the cable.
 - **E-marker:** the chip in the cable plug. It reports the current (3 A / 5 A), the voltage (20 V / 50 V), the speed and other data. A source can offer more than 3 A only after it reads "5 A" from the e-marker.
 - **SOP\* (Start of Packet):** a 4-symbol marker at the start of each PD packet. It is the address:
