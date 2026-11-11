@@ -1,0 +1,5 @@
+# Power-Z captures (kept local)
+*.sqlite
+Anker737PowerCore24K/
+# Script output
+UsbPdInfo_*/
