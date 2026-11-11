@@ -306,18 +306,7 @@ Searches in English and Nordic languages found **no** reviews or forum reports o
 | T6 | HP + Anker 737, with the Anker as a fixed source (wait 15 s) | Already OK in the captures. Repeat to rule out chance |
 | T7 | **Oppo Find X9 Pro** + Sandberg C1, T2 procedure (wait 15 s) × 5. Once with **OTG off** and once with **OTG on** (phones usually only cycle as dual-role with OTG on) | A third sink. OTG off = sink-only control, OTG on = dual-role. Also shows whether the Sandberg's PPS works. Note: Oppo's "100 W" is most likely its proprietary SUPERVOOC, so standard PD/PPS will probably negotiate much less, and this test can't check the 100 W / 5 A issue |
 
-### 8.3 Second tester (newer EliteBook, no failures)
-
-Ask for:
-- the exact model;
-- BIOS and **USB-C controller firmware version** (from `Collect-UsbPdInfo.ps1`, file `02_hp_bios_usb_power.txt`);
-- laptop state when plugging in;
-- plug-in order and the time since the powerbank was last unplugged;
-- **the negotiated power**: does it also stop at 20 V 3 A / about 55 W?
-
-If possible, a Power-Z capture.
-
-### 8.4 Laptop side
+### 8.3 Laptop side
 
 - Run `Collect-UsbPdInfo.ps1` (see `Collect-UsbPdInfo_README.md`). Compare the PD firmware version and the UCSI event log around failures.
 - Check for HP BIOS / USB-C PD firmware updates (HP Image Assistant).
