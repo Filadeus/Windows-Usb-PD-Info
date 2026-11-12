@@ -25,7 +25,7 @@ The Sandberg powerbank has **two independent problems**:
 
 | # | Problem | Most likely cause | Confidence |
 |---|---|---|---|
-| **A** | Some sinks do not answer the power offers when the **Sandberg powers on first**. The Sandberg sends 50 offers in about 8.6 s. Then it stops and stays at 5 V with no charging | The **HP (awake)** and the **Anker 737** try to become the source a few ms after VBUS comes on (Try.SRC behaviour). A compliant source (the Anker) detects this and removes VBUS. The **Sandberg does not**. It keeps VBUS on and goes into a CC fault state that it does not leave until you unplug the cable from the Sandberg. It also never sends a new offer, which PD R3.3 requires [S6] | The pattern is the same in all 116 plug-ins. The reference recordings show the mechanism (section 4.4) |
+| **A** | Some sinks (the awake HP, the Anker 737) do not answer the power offers when the **Sandberg powers on first**. The ASUS, the Oppo and the MacBook Air always answer. The Sandberg sends 50 offers in about 8.6 s. Then it stops and stays at 5 V with no charging | The **HP (awake)** and the **Anker 737** try to become the source a few ms after VBUS comes on (Try.SRC behaviour). A compliant source (the Anker) detects this and removes VBUS. The **Sandberg does not**. It keeps VBUS on and goes into a CC fault state that it does not leave until you unplug the cable from the Sandberg. It also never sends a new offer, which PD R3.3 requires [S6] | The pattern is the same in all 119 plug-ins. The reference recordings show the mechanism (section 4.4) |
 | **B** | The Sandberg "100 W" port (C1) always offers **20 V 3 A = 60 W** at most as a source. As a sink, the same port takes the full 100 W (section 5.4) | The **Sandberg does not supply VCONN**, so it cannot read the cable e-marker. The PD specification then limits the source to 3 A [S1]. Type-C requires a source that supplies more than 3 A to source VCONN [S2] | **Proven by measurement** |
 
 We also recorded a **third fault, on the C2 (27 W) port only**. On C2 the Sandberg does not run PD and supplies only about 4.6 V. The laptop then charges slowly at 5 V (section 4.5).
@@ -57,6 +57,7 @@ These items do **not** cause the problems:
 |---|---|---|
 | **HP EliteBook 840 G11**, 56 Wh | HP supplies a 65 W USB-C adapter. HP also lists a 110 W USB-C adapter for this model | Requests 20 V 5 A when the source offers it. Takes up to **4.29 A (about 84 W)** |
 | **ASUS ProArt P16 H7606**, 90 Wh | USB-C PD 45–100 W (third-party specifications). Barrel adapter 200/240 W | Requests 20 V 5 A when the source offers it. Takes up to **4.58 A (87.5 W)** |
+| **Apple MacBook Air 13-inch (M4)**, 53.8 Wh | Apple supplies a 30 W or 35 W adapter. Fast charge needs a 70 W adapter | Requests 20 V 3 A (the most the Sandberg offers). Takes up to **2.9 A (58 W)**. Never tries to become the source |
 
 ### Cables (decoded e-marker identity)
 
@@ -106,6 +107,7 @@ All three cables send a valid identity reply when the requester supplies VCONN. 
 | `F0KYM-HTN1-533/DR1kSPS_Anker_Charging_Asususerdata.db` | **Reference**: Anker 737 → ASUS, Power-Z at the Anker port | Awake | All OK. The ASUS does not add Rp after VBUS |
 | `SandbergTravelCharger_to_Sandberg2mpd.sqlite` | **Sandberg as sink.** Sandberg Travel Charger 441-71 → Sandberg C1, StarTech cable, Power-Z at C1. 2 plug-ins | — | Both OK: the Sandberg requested **20 V 5 A** and drew 4.9 A (94–95 W) |
 | `Verbatim_to_SandbergPB2mpd.sqlite` | **Sandberg as sink.** Verbatim GaN 200 W → Sandberg C1, same cable and meter position. 2 plug-ins | — | Both OK: 20 V 5 A requested, 4.9 A drawn (94 W) |
+| `StarTechCable_Success_MacBook.sqlite` | Sandberg → **MacBook Air M4**, StarTech cable, Power-Z at the Sandberg. 3 plug-ins at C1. At 25–37 s the Power-Z was on **C2** (27 W port) | Awake | **C1: 3 of 3 OK**, all Sandberg first, 20 V 3 A. **C2: FAIL**: no PD, 5 V only, 2 Hard Resets ignored (section 4.5) |
 | `StarTech_HPSleepToAwake_pd.sqlite` | Sandberg, StarTech cable, Power-Z at the laptop. The HP wakes up at about 80 s | Asleep, then awake | Asleep: 1 of 1 OK. Awake: 4 laptop-first OK, 9 Sandberg-first FAIL (section 4.3, chart 11) |
 
 ---
@@ -182,12 +184,13 @@ Both devices are **dual-role ports (DRP)**. Each device can supply power or take
 | Oppo Find X9 Pro, OTG off | 5 | **5 OK** | 179–900 ms |
 | Oppo Find X9 Pro, OTG on | 5 | **5 OK** | 890–900 ms |
 | Oppo Find X9 Pro (T8, Data Recorder) | 5 | **5 OK** | not measured |
+| Apple MacBook Air M4 (awake) | 3 | **3 OK** | 251–361 ms |
 | HP EliteBook (asleep) | 7 | **7 OK** | 199–522 ms |
 
 Conclusions from this table:
 
 - **The fault is not specific to the HP.** The Anker 737 fails in the same way.
-- **The delay is not the cause.** The ASUS and the Oppo work with equal or longer delays.
+- **The delay is not the cause.** The ASUS, the Oppo and the MacBook work with equal or longer delays.
 
 **After a failure, the Sandberg stays in the fault (T2, T5).** The Sandberg kept **VBUS at 5.14 V for the full 2-minute capture**. It also kept the PD line at **about 1.94–1.98 V** and its VCONN pin at **0.86–0.88 V**. This continued during the 15 s periods when only the cable was attached. In that condition, a normal source measures about 3.25 V (an open pull-up). Then it detects the detach and brings VBUS to vSafe0V within tSafe0V (650 ms) [S10]. The Sandberg did this in T4 and T7. With the HP and the Anker it did not. **This is a Type-C deviation.**
 
@@ -210,7 +213,7 @@ Thus the Sandberg itself causes the fault level on the CC pins, at least in part
 > 3. A compliant source sees the PD line go open (both sides have Rp, so the line rises above the 2.43 V disconnect threshold [S12]). It removes VBUS and lets the partner become the source [S10] [S11]. A role swap then gives a normal contract.
 > 4. The **Sandberg does not see the open line**. The line goes only to about 1.95–2.0 V, not to about 3.2 V. For a source with a 3 A pull-up, 1.95 V is inside the "Rd attached" window of 0.88–2.18 V [S12]. Thus the Sandberg still sees a sink. The Sandberg keeps VBUS on, its VCONN pin goes to about 0.86 V, and no PD contract occurs. The Sandberg stays in this state until you unplug the cable from the Sandberg.
 >
-> The ASUS, the Oppo and the sleeping HP do not try to become the source after VBUS comes on. Thus they never cause the fault.
+> The ASUS, the Oppo, the MacBook Air and the sleeping HP do not try to become the source after VBUS comes on. Thus they never cause the fault.
 
 **Evidence from the reference recordings (Data Recorder, 1 kSPS):**
 
@@ -265,11 +268,12 @@ Thus the cause is probably an action in the **Sandberg attach sequence**. Some m
 | Anker 737 (as sink) | 5 | **Yes**, at +1 to +2 ms | 5 FAIL. The CC pins stay at 1.98–2.00 V / 0.88 V |
 | ASUS ProArt P16 | 4 (and 1 with the ASUS as the first source) | **No** | 5 OK, 20 V |
 | Oppo Find X9 Pro | 5 | **No** | 5 OK, PPS / 9 V |
+| Apple MacBook Air M4 | 3 (Power-Z, 10 ms samples) | **No**. The CC line stays at 1.58–1.65 V (Rd) | 3 OK, 20 V |
 
 What T8 shows:
 
 - The CC step occurs with **each** failure and with **no** success. The step is the fault.
-- The step occurs only with the HP and the Anker 737. It does not occur with the ASUS or the Oppo.
+- The step occurs only with the HP and the Anker 737. It does not occur with the ASUS, the Oppo or the MacBook.
 - The step time is different for each sink: +1 to +2 ms with the Anker, +3 to +5 ms with the HP. Thus the Sandberg probably reacts to something that the sink does just after VBUS comes on.
 - Before switch-on, all four sinks show similar CC levels (Rd 1.59–1.70 V, cable Ra 0.32 V). The 1 kSPS data shows no difference that explains the step.
 - The PD captures show no message from the sink before the step. The first PD message is the Sandberg SOP' probe, about 50 ms after switch-on. Thus the trigger is electrical, not a PD message.
@@ -284,14 +288,15 @@ To find the trigger, the next tool must sample faster than the Data Recorder. Us
 
 ![Switch-on delay vs outcome](charts/03_switch_on_delay.png)
 
-*The chart shows the time from the sink attach to the 5 V switch-on, for plug-ins with the powerbank as the first source. The ASUS and the Oppo work with the Sandberg at equal or longer delays. Thus the slow switch-on alone does not cause the fault.*
+*The chart shows the time from the sink attach to the 5 V switch-on, for plug-ins with the powerbank as the first source. The ASUS, the Oppo and the MacBook work with the Sandberg at equal or longer delays. Thus the slow switch-on alone does not cause the fault.*
 
 ### 4.5 Second fault: the Sandberg PD engine does not operate
 
-This fault occurs **on the C2 (27 W) port**. Both captures of it are on C2:
+This fault occurs **on the C2 (27 W) port**. All three captures of it are on C2:
 
 - `Sandberg3Fails1OK_PowerZ_at_C1_WorstSoFar_27Wpd.sqlite` (84 s, 7 cycles). The original file name says C1, but the recording is from C2.
 - `Sandberg-Ankerpd.sqlite`, 1438–1448 s.
+- `StarTechCable_Success_MacBook.sqlite`, 28–37 s, with the MacBook Air M4.
 
 We did not see this fault on C1.
 
@@ -307,6 +312,9 @@ after ~9 s the laptop detaches, ~3 s later it attaches again → loop
 - Terminations at C1: Sandberg Rp (3 A level) on both pins, laptop Rd. Thus **the Sandberg is the source**.
 - In this fault, the laptop operates as the specification permits [S7]. The Sandberg deviates in two ways: VBUS below vSafe5V [S9], and no response to Hard Reset [S8]. This is different from Finding A.
 - The trigger is not known. It is possibly the Sandberg state, for example its battery charge or the result of earlier failures.
+- **The MacBook sees the same fault.** C2 switched VBUS on **2.1 s** after the attach (C1: 0.25–0.36 s). VBUS was 5.05 V, so the low voltage is not part of every C2 fault. The MacBook sent a Hard Reset 0.6 s after VBUS came on, and again 5.5 s later [S7]. C2 ignored both [S8]. The MacBook drew up to 2.9 A at 5 V, the Type-C current that the Rp level permits. Thus the C2 fault is not specific to the HP.
+
+![C2 with the MacBook](charts/13_c2_macbook.png)
 
 ### 4.6 Workarounds
 
@@ -324,7 +332,8 @@ after ~9 s the laptop detaches, ~3 s later it attaches again → loop
 - The PD specification permits more than 3 A **only after the source reads "5 A" from the cable e-marker** [S1]. To read the e-marker, the source must supply **VCONN** to it [S2], and only the VCONN source may talk to the cable [S3].
 - **The Sandberg does not supply VCONN.** Its own VCONN pin measures **0.32 V** in successful plug-ins. This is only its pull-up current into the 1 kΩ cable resistor (Ra) [S12]. In failures it measures **0.85 V**. VCONN must be 3.0–5.5 V [S2]. The PD specification leaves the VCONN supply rules to the Type-C specification. Type-C Table 4-4 is explicit [S2]. A source without USB data that supplies more than 3 A is "Required to source 100 mW" of VCONN. It may remove VCONN only after it has read the cable e-marker. The Sandberg advertises 100 W and sources no VCONN. **This is a Type-C deviation and the root cause of Finding B.** In PD terms the Sandberg then follows the rules: without a cable reply it may offer only 3 A [S1]. The sink side of the same port is not affected (section 5.4).
 - Thus the cable never answers the Sandberg SOP' Discover_Identity probes, with any cable.
-- When the laptop asks for VCONN (VCONN_Swap [S23]), the Sandberg accepts. It never takes VCONN back to read the cable again. The specification does not require this, so this point is a limitation, not a deviation.
+- When the laptop asks for VCONN (VCONN_Swap [S23]), the Sandberg accepts. It never takes VCONN back to read the cable again. The specification does not require this, so this point is a limitation, not a deviation. The MacBook capture shows the result: the MacBook took VCONN, read the StarTech e-marker and got the answer "5 A". The Sandberg stayed at 20 V 3 A. PD has no message with which a sink can give the cable current to the source. Only the source's own reading counts [S1] [S3].
+- **The Sandberg firmware regards C1 as a 100 W source.** In its Source_Capabilities_Extended reply to the MacBook, the SPR Source PDP Rating field reads **100 W** [S24]. The PDOs in the same session stop at 60 W. Thus the 60 W limit is not a deliberate rating. It is the result of the missing cable reading.
 - The 3 A offer itself follows the specification: a source that has not read the cable must limit its offer to 3 A [S1]. The deviation is that the Sandberg never creates the condition to offer more. Thus the advertised 100 W is not reachable with any cable.
 
 ![Power envelope](charts/10_power_envelope.png)
@@ -350,6 +359,7 @@ The Sandberg does step 3. It does not do steps 4–6.
 |---|---|---|---|
 | Sandberg C1 → HP | 20 V 3 A | 2.76–2.78 A | about 55 W |
 | Sandberg C1 → ASUS | 20 V 3 A | 2.76 A | 53.7 W |
+| Sandberg C1 → MacBook Air M4 | 20 V 3 A | up to 2.9 A (mean 1.1–1.7 A) | up to 58 W |
 | Anker 737 → HP | 20 V 5 A | 4.29–4.32 A | about 84 W |
 | Anker 737 → ASUS | 20 V 5 A | 4.58 A | 87.5 W (the 3 m cable loses about 5 W) |
 | **Sandberg Travel Charger → Sandberg C1 (as sink)** | 20 V 5 A | 4.90 A | 94–95 W |
@@ -390,8 +400,10 @@ We searched in English and in Nordic languages. We found **no** review or forum 
 | Answers `Discover_SVIDs` and `Alert` with **Not_Supported** | A responder with no SVIDs shall return NAK. Not_Supported is only for messages the port does not support | Deviation for Discover_SVIDs: the Sandberg supports structured VDMs, so it must NAK. Not_Supported to Alert is permitted. The Anker 737 also does that | [S14] [S15] |
 | SOP' probes at 5 V **without VCONN** | A source that supplies more than 3 A is required to source VCONN (100 mW) until it has read the e-marker. Only the VCONN source talks to the cable | Causes Finding B. Deviation | [S2] [S3] |
 | After 50 offers with no answer: no more messages, stays at 5 V | After nCapsCount the source stops, then sends one Source_Capabilities after tTypeCSendSourceCapIdle (at most 5 s), and repeats this | Deviation: the Sandberg never resumes. Makes Finding A permanent | [S6] |
-| **C2 port:** no PD traffic with the HP. The Sandberg ignores 3 Hard Resets from the laptop. 1.4–1.76 A flows, and **VBUS drops to 4.21 V** | PD offers, 27 W. VBUS 4.75–5.5 V | The same fault as in section 4.5. The **Sandberg is the source** (the laptop VCONN pin read 0 V, so the laptop showed only Rd). 4.21 V is below vSafe5V. Deviation | [S9] |
+| **C2 port:** no PD traffic with the HP. The Sandberg ignores 3 Hard Resets from the laptop, and 2 from the MacBook Air. 1.4–1.76 A flows, and **VBUS drops to 4.21 V** | PD offers, 27 W. VBUS 4.75–5.5 V | The same fault as in section 4.5. The **Sandberg is the source** (the laptop VCONN pin read 0 V, so the laptop showed only Rd). 4.21 V is below vSafe5V. Deviation | [S9] |
 | As a sink, changes its CC pin to Rp about 30 ms after the charger applies 5 V, twice per attach, before it holds Rd | A DRP may contest the role (Try.SRC). The partner must then remove VBUS | No effect with source-only chargers, which remove VBUS and retry. Permitted | [S11] |
+| Source_Capabilities_Extended declares **SPR Source PDP Rating = 100 W**. Other fields are placeholders: XID 0x67452301, FW and HW version 0x10, PID 0x0010, 4 batteries, no peak current, no touch current | The PDP rating is the Port Maximum PDP. A source shall provide the PDOs that its Port Present PDP requires | The firmware regards C1 as a 100 W source. Its offers never pass 60 W (Finding B). Quirk | [S24] |
+| Sink_Capabilities lists only **5 V 3 A**. As a sink, the same port requests and draws 20 V 5 A | Sink_Capabilities describes the port's power and voltage requirements as a sink | Cosmetic. A source that reads this message expects a 15 W sink. Quirk | [S25] |
 | **Ignores Hard Reset** | VBUS must go to vSafe0V, then back to vSafe5V | The laptop recovery attempts have no effect. Deviation | [S8] |
 | **Keeps VBUS on with nothing attached** (section 4.3) | After a detach, VBUS to vSafe0V within tSafe0V (650 ms) | The fault persists until an unplug at the Sandberg. Deviation | [S10] |
 | 5 V switch-on 179–521 ms after the sink attach | tVBUSON is at most 275 ms from entry to Attached.SRC, which follows tCCDebounce (100–200 ms). Thus at most 475 ms from attach | Slow. The 499–521 ms cases are outside the limit. Not the cause of Finding A | [S17] |
@@ -417,16 +429,16 @@ We searched in English and in Nordic languages. We found **no** review or forum 
 
 ## 7. Timing and power measurements
 
-| Measurement | HP + Sandberg | HP + Anker 737 | ASUS + Sandberg | ASUS + Anker 737 |
-|---|---|---|---|---|
-| Attach → VBUS on (powerbank as fixed source) | **179–521 ms** | 26–51 ms | 220–511 ms | about 190 ms |
-| VBUS → first **acknowledged** Source_Cap | about 100 ms (OK), 800 ms (50% case), or never | about 240 ms (no answer to the first burst at about 60 ms, retry +185 ms) | 96–122 ms | 237–242 ms |
-| Source_Cap → Request (laptop reply time, limit tSenderResponse 27–50 ms [S20]) | **6–7 ms** | **6–7 ms** | **10–12 ms** | **10–12 ms** |
-| Request → Accept (powerbank) | 4–8 ms | 3 ms | 6–7 ms | 3 ms |
-| Accept → PS_RDY (change to 20 V) | 85–91 ms | 51–169 ms | 87–91 ms | 52–104 ms |
-| Retry interval for offers with no answer (SourceCapabilityTimer 100–200 ms [S6]) | 175 ms | about 185 ms | — | — |
+| Measurement | HP + Sandberg | HP + Anker 737 | ASUS + Sandberg | ASUS + Anker 737 | MacBook + Sandberg |
+|---|---|---|---|---|---|
+| Attach → VBUS on (powerbank as fixed source) | **179–521 ms** | 26–51 ms | 220–511 ms | about 190 ms | 251–361 ms |
+| VBUS → first **acknowledged** Source_Cap | about 100 ms (OK), 800 ms (50% case), or never | about 240 ms (no answer to the first burst at about 60 ms, retry +185 ms) | 96–122 ms | 237–242 ms | 102–108 ms |
+| Source_Cap → Request (laptop reply time, limit tSenderResponse 27–50 ms [S20]) | **6–7 ms** | **6–7 ms** | **10–12 ms** | **10–12 ms** | **14–15 ms** |
+| Request → Accept (powerbank) | 4–8 ms | 3 ms | 6–7 ms | 3 ms | 4–6 ms |
+| Accept → PS_RDY (change to 20 V) | 85–91 ms | 51–169 ms | 87–91 ms | 52–104 ms | 84–87 ms |
+| Retry interval for offers with no answer (SourceCapabilityTimer 100–200 ms [S6]) | 175 ms | about 185 ms | — | — | — |
 
-- The laptop reply time is the **same with each powerbank**. The laptop sets it, not the source.
+- The laptop reply time is the **same with each powerbank**. The laptop sets it, not the source. The MacBook replies in 14–15 ms.
 - The voltage drop through the 3 m Anker cable is about 0.2–0.25 Ω (both conductors). Example: 20.26 V → 19.13 V at 4.58 A.
 
 ---
@@ -453,6 +465,7 @@ We searched in English and in Nordic languages. We found **no** review or forum 
 | T7 | **Oppo Find X9 Pro** + Sandberg C1, T2 procedure (wait 15 s), 5 times. One time with **OTG off**, one time with **OTG on** | **Done: 5 of 5 OK each.** The Sandberg PPS works (about 8.5 V 3 A, 26 W, OTG off). With OTG on the phone used fixed 9 V |
 | T8 | **Data Recorder (1 kSPS) at C1.** Sandberg-first plug-ins with the **ASUS** and the **Oppo**. Use the Anker 737 for comparison | **Done.** The CC step occurs with the Anker (5 of 5, all FAIL). It does not occur with the ASUS (5 of 5 OK) or the Oppo (5 of 5 OK). See section 4.4 |
 | T9 | **Oscilloscope or logic analyzer** (µs resolution) on CC1, CC2 and VBUS at C1. Compare a Sandberg-first plug-in with the Anker or the HP against one with the ASUS | Shows what occurs in the 1–5 ms before the step: a short Rp from the sink, a CC glitch, or a VBUS current spike |
+| T10 | **MacBook Air M4** + Sandberg C1, StarTech cable, Power-Z at the Sandberg, 3 plug-ins. Then 1 plug-in at C2 | **Done: C1 3 of 3 OK** (Sandberg first). The MacBook never adds Rp after VBUS, so there is no contest. **C2: the PD-engine fault** (section 4.5) |
 
 ### 8.3 Laptop side
 
@@ -492,6 +505,8 @@ The tags [S1]–[S23] in this document point to these clauses.
 | S20 | SenderResponseTimer: the response to a message that needs one must arrive within tSenderResponse (27–50 ms) | PD §7.31.2 SenderResponseTimer (p. 237), timer value table (p. 250) | Verified |
 | S21 | Policy Engine state diagrams for the source port and the sink port | PD §9.2 (p. 289), §9.2.3 Source Port (p. 293), §9.2.4 Sink Port (p. 301) | Verified |
 | S22 | Packet format: preamble, SOP*, header, data objects, CRC-32, EOP. BMC coding, fBitRate 300 kbit/s (270–330) | PD §5.3 BMC Signaling (p. 91), §5.3.1.1 Packet Formation and Figure 5.1 (p. 92), §5.3.1.1.4 CRC (p. 95), §5.5.1 BMC Common Parameters (p. 115) | Verified |
+| S24 | Source_Capabilities_Extended. Field 23 "SPR Source PDP Rating": "PDP Rating of the Port operating in SPR Mode, in watts". "The Port Maximum PDP Shall be the same as ... the SPR Source PDP Rating in the Source_Capabilities_Extended Message for a Port that is not EPR Capable." "A Source Shall provide the PDO/APDOs required for its Port Present PDP as shown in Table 3.2" | PD §6.5.2 Source_Capabilities_Extended Message, Table 6.59 (p. 185–187), §7.26.2.1 Port Maximum PDP Field (p. 229), §3.2.3 Managed Capability Port, rule 3, and Table 3.2 (p. 39) | Verified |
+| S25 | Sink_Capabilities: "used by a Port to describe its power and voltage requirements when acting as a Sink in SPR Mode" | PD §6.4.1.2 Sink_Capabilities Message (p. 131) | Verified |
 | S23 | DR_Swap, PR_Swap and VCONN_Swap messages and sequences | PD §6.3.9, §6.3.10, §6.3.11 (p. 126), §7.10 Power Role Swap AMS (p. 222), §7.12 Data Role Swap AMS, §7.13 VCONN Swap AMS (p. 223), §9.2.20 Dual-Role Port State Diagrams (p. 342), §9.2.21 VCONN Swap State Diagram (p. 366) | Verified |
 
 ---
